@@ -97,11 +97,12 @@ class App < Sinatra::Base
       return 403
     end
 
-    # TODO: パスワードをキャッシュさせるのはありなのか...してみる2
-    hash_pass_on_redis = $redis.get("user_hash_password_#{row['id']}")
+    # TODO: パスワードをキャッシュさせるのはありなのか...してみる
+    # id, paramsを渡してhashのパスワードをヒットさせる
+    hash_pass_on_redis = $redis.get("user_hash_password_#{row['id']}_#{params[:password]}")
     if hash_pass_on_redis.nil?
       hash_pass_on_redis = Digest::SHA1.hexdigest(row['salt'] + params[:password])
-      $redis.set("user_hash_password_#{row['id']}", hash_pass_on_redis)
+      $redis.set("user_hash_password_#{row['id']}_#{params[:password]}", hash_pass_on_redis)
     end
 
     if row['password'] != hash_pass_on_redis
@@ -171,7 +172,7 @@ class App < Sinatra::Base
       return 403
     end
 
-    sleep 1.0
+    sleep 1.5
 
     # rows = db.query('select channel.id, haveread.user_id, haveread.message_id from channel inner join haveread on channel.id = haveread.channel_id').to_a
     rows = db.query('SELECT id FROM channel').to_a
@@ -395,9 +396,8 @@ class App < Sinatra::Base
 
   def db_add_message(channel_id, user_id, content)
     statement = db.prepare('INSERT INTO message (channel_id, user_id, content, created_at) VALUES (?, ?, ?, NOW())')
-    messages = statement.execute(channel_id, user_id, content)
+    statement.execute(channel_id, user_id, content)
     statement.close
-    messages
   end
 
   def random_string(n)
