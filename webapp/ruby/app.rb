@@ -85,9 +85,9 @@ class App < Sinatra::Base
   end
 
   post '/login' do
+    binding.pry
     name = params[:name]
     statement = db.prepare('SELECT * FROM user WHERE name = ?')
-    binding.pry
     row = statement.execute(name).first
     if row.nil? || row['password'] != Digest::SHA1.hexdigest(row['salt'] + params[:password])
       return 403
