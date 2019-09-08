@@ -2,9 +2,12 @@ require 'digest/sha1'
 require 'mysql2'
 require 'sinatra/base'
 require 'pry'
+require 'redis'
 
 
 class App < Sinatra::Base
+
+  $redis = Redis.new(:host => '127.0.0.1', :port => 6379)
   configure do
     set :session_secret, 'tonymoris'
     set :public_folder, File.expand_path('../../public', __FILE__)
@@ -89,9 +92,22 @@ class App < Sinatra::Base
     name = params[:name]
     statement = db.prepare('SELECT id, name, password, salt FROM user WHERE name = ? limit 1')
     row = statement.execute(name).first
-    if row.nil? || row['password'] != Digest::SHA1.hexdigest(row['salt'] + params[:password])
+
+    if row.nil?
       return 403
     end
+
+    # TODO: パスワードをキャッシュさせるのはありなのか...してみる2
+    hash_pass_on_redis = $redis.get("user_hash_password_#{row['id']}")
+    if hash_pass_on_redis.nil?
+      hash_pass_on_redis = Digest::SHA1.hexdigest(row['salt'] + params[:password])
+      $redis.set("user_hash_password_#{row['id']}", hash_pass_on_redis)
+    end
+
+    if row['password'] != hash_pass_on_redis
+      return 403
+    end
+
     session[:user_id] = row['id']
     redirect '/', 303
   end
