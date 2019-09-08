@@ -1,6 +1,7 @@
 require 'digest/sha1'
 require 'mysql2'
 require 'sinatra/base'
+require 'pry'
 
 
 class App < Sinatra::Base
@@ -85,9 +86,8 @@ class App < Sinatra::Base
   end
 
   post '/login' do
-    binding.pry
     name = params[:name]
-    statement = db.prepare('SELECT * FROM user WHERE name = ?')
+    statement = db.prepare('SELECT id, name, password, salt FROM user WHERE name = ?')
     row = statement.execute(name).first
     if row.nil? || row['password'] != Digest::SHA1.hexdigest(row['salt'] + params[:password])
       return 403
@@ -120,13 +120,15 @@ class App < Sinatra::Base
 
     channel_id = params[:channel_id].to_i
     last_message_id = params[:last_message_id].to_i
-    statement = db.prepare('SELECT * FROM message WHERE id > ? AND channel_id = ? ORDER BY id DESC LIMIT 100')
+    # statement = db.prepare('SELECT * FROM message WHERE id > ? AND channel_id = ? ORDER BY id DESC LIMIT 100')
+    statement = db.prepare('SELECT message.id, channel_id, user_id, content, user.created_at,user.name, user.display_name, user.avatar_icon FROM message left join user on user.id = message.user_id WHERE user.id > ? AND channel_id = ? ORDER BY message.id DESC LIMIT 100')
     rows = statement.execute(last_message_id, channel_id).to_a
     response = []
     rows.each do |row|
       r = {}
       r['id'] = row['id']
       statement = db.prepare('SELECT name, display_name, avatar_icon FROM user WHERE id = ?')
+      # r['user'] = { 'name' => row['name'], 'display_name' => row['display_name'], 'avatar_icon' => row['avatar_icon'] }
       r['user'] = statement.execute(row['user_id']).first
       r['date'] = row['created_at'].strftime("%Y/%m/%d %H:%M:%S")
       r['content'] = row['content']
