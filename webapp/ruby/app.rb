@@ -87,7 +87,7 @@ class App < Sinatra::Base
 
   post '/login' do
     name = params[:name]
-    statement = db.prepare('SELECT id, name, password, salt FROM user WHERE name = ?')
+    statement = db.prepare('SELECT id, name, password, salt FROM user WHERE name = ? limit 1')
     row = statement.execute(name).first
     if row.nil? || row['password'] != Digest::SHA1.hexdigest(row['salt'] + params[:password])
       return 403
@@ -399,13 +399,18 @@ class App < Sinatra::Base
   end
 
   def get_channel_list_info(focus_channel_id = nil)
-    channels = db.query('SELECT * FROM channel ORDER BY id').to_a
-    description = ''
-    channels.each do |channel|
-      if channel['id'] == focus_channel_id
-        description = channel['description']
-        break
-      end
+    if focus_channel_id.nil?
+      channels = db.query('SELECT * FROM channel ORDER BY id').to_a
+      description = ''
+      # channels.each do |channel|
+      #   if channel['id'] == focus_channel_id
+      #     description = channel['description']
+      #     break
+      #   end
+      # end
+    else
+      channels = db.query('SELECT * FROM channel ORDER BY id').to_a
+      description = channels.find { |channel| channel['id'] == focus_channel_id }['description']
     end
     [channels, description]
   end
