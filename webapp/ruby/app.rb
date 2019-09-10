@@ -7,7 +7,7 @@ require 'redis'
 
 class App < Sinatra::Base
 
-  $redis = Redis.new(:host => '127.0.0.1', :port => 6379)
+  $redis = Redis.new(:host => 'redis', :port => 6379)
   configure do
     set :session_secret, 'tonymoris'
     set :public_folder, File.expand_path('../../public', __FILE__)
