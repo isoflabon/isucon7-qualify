@@ -28,7 +28,14 @@ class App < Sinatra::Base
       user_id = session[:user_id]
       return nil if user_id.nil?
 
-      @_user = db_get_user(user_id)
+      user_on_cache = $redis.get("user_id_#{user_id}")
+      if user_on_cache
+        @_user = JSON.parse(user_on_cache)
+      else
+        @_user = db_get_user(user_id)
+        $redis.set("user_id_#{user_id}", @_user.to_json)
+      end
+
       if @_user.nil?
         params[:user_id] = nil
         return nil
@@ -89,26 +96,13 @@ class App < Sinatra::Base
   end
 
   post '/login' do
+    # name => user_infoを載せておいてsql書かないようにするとよい？
     name = params[:name]
     statement = db.prepare('SELECT id, name, password, salt FROM user WHERE name = ? limit 1')
     row = statement.execute(name).first
-
-    if row.nil?
+    if row.nil? || row['password'] != Digest::SHA1.hexdigest(row['salt'] + params[:password])
       return 403
     end
-
-    # TODO: パスワードをキャッシュさせるのはありなのか...してみる
-    # id, paramsを渡してhashのパスワードをヒットさせる
-    hash_pass_on_redis = $redis.get("user_hash_password_#{row['id']}_#{params[:password]}")
-    if hash_pass_on_redis.nil?
-      hash_pass_on_redis = Digest::SHA1.hexdigest(row['salt'] + params[:password])
-      $redis.set("user_hash_password_#{row['id']}_#{params[:password]}", hash_pass_on_redis)
-    end
-
-    if row['password'] != hash_pass_on_redis
-      return 403
-    end
-
     session[:user_id] = row['id']
     redirect '/', 303
   end
