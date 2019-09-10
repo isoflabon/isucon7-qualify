@@ -51,6 +51,11 @@ class App < Sinatra::Base
     db.query("DELETE FROM channel WHERE id > 10")
     db.query("DELETE FROM message WHERE id > 10000")
     db.query("DELETE FROM haveread")
+    users = db.query("select * FROM user").to_a
+    users.each do |user|
+      $redis.set("user_#{user['id']}", user.to_json)
+      $redis.set("user_name_to_id_#{user['name']}", user['id'])
+    end
     204
   end
 
@@ -88,6 +93,10 @@ class App < Sinatra::Base
       return 409 if e.error_number == 1062
       raise e
     end
+    user = db.prepare('SELECT * FROM user WHERE id = ?').execute(user_id)
+    $redis.set("user_#{user_id}", user.to_json)
+    $redis.set("user_name_to_id_#{user['name']}", user_id)
+
     session[:user_id] = user_id
     redirect '/', 303
   end
@@ -99,13 +108,14 @@ class App < Sinatra::Base
   post '/login' do
     # name => user_infoを載せておいてsql書かないようにするとよい？
     name = params[:name]
-    user_on_cache = $redis.get("user_name_#{name}")
-    if user_on_cache
-      row = JSON.parse(user_on_cache)
+    user_id = $redis.get("user_name_to_id_#{name}")
+    if user_id
+      row = JSON.parse($redis.get("user_#{user_id}"))
     else
-      statement = db.prepare('SELECT id, name, password, salt FROM user WHERE name = ? limit 1')
-      row = statement.execute(name).first
-      $redis.set("user_name_#{name}", row.to_json)
+      return 403
+      # statement = db.prepare('SELECT id, name, password, salt FROM user WHERE name = ? limit 1')
+      # row = statement.execute(name).first
+      # $redis.set("user_name_#{name}", row.id)
     end
 
     if row.nil? || row['password'] != Digest::SHA1.hexdigest(row['salt'] + params[:password])
