@@ -107,26 +107,36 @@ class App < Sinatra::Base
   end
 
   post '/login' do
-    # name => user_infoを載せておいてsql書かないようにするとよい？
     name = params[:name]
-    user_id = $redis.get("user_name_to_id_#{name}")
-    if user_id
-      row = JSON.parse($redis.get("user_#{user_id}"))
-    else
-      statement = db.prepare('SELECT id, name, password, salt FROM user WHERE name = ? limit 1')
-      row = statement.execute(name).first
-      unless row.nil?
-        $redis.set("user_name_to_id_#{name}", row['id'])
-        $redis.set("user_#{user_id}", row.to_json)
-      end
-    end
-
+    statement = db.prepare('SELECT id, name, password, salt FROM user WHERE name = ?')
+    row = statement.execute(name).first
     if row.nil? || row['password'] != Digest::SHA1.hexdigest(row['salt'] + params[:password])
       return 403
     end
     session[:user_id] = row['id']
     redirect '/', 303
   end
+  # post '/login' do
+  #   # name => user_infoを載せておいてsql書かないようにするとよい？
+  #   name = params[:name]
+  #   user_id = $redis.get("user_name_to_id_#{name}")
+  #   if user_id
+  #     row = JSON.parse($redis.get("user_#{user_id}"))
+  #   else
+  #     statement = db.prepare('SELECT id, name, password, salt FROM user WHERE name = ? limit 1')
+  #     row = statement.execute(name).first
+  #     unless row.nil?
+  #       $redis.set("user_name_to_id_#{name}", row['id'])
+  #       $redis.set("user_#{user_id}", row.to_json)
+  #     end
+  #   end
+  #
+  #   if row.nil? || row['password'] != Digest::SHA1.hexdigest(row['salt'] + params[:password])
+  #     return 403
+  #   end
+  #   session[:user_id] = row['id']
+  #   redirect '/', 303
+  # end
 
   get '/logout' do
     session[:user_id] = nil
