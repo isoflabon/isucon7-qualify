@@ -8,6 +8,7 @@ require 'redis'
 class App < Sinatra::Base
 
   $redis = Redis.new(:host => 'redis', :port => 6379)
+  # $redis = Redis.new(:host => '127.0.0.1', :port => 6379)
   configure do
     set :session_secret, 'tonymoris'
     set :public_folder, File.expand_path('../../public', __FILE__)
@@ -93,7 +94,7 @@ class App < Sinatra::Base
       return 409 if e.error_number == 1062
       raise e
     end
-    user = db.prepare('SELECT * FROM user WHERE id = ?').execute(user_id)
+    user = db.prepare('SELECT * FROM user WHERE id = ?').execute(user_id).first
     $redis.set("user_#{user_id}", user.to_json)
     $redis.set("user_name_to_id_#{user['name']}", user_id)
 
