@@ -113,10 +113,10 @@ class App < Sinatra::Base
     if user_id
       row = JSON.parse($redis.get("user_#{user_id}"))
     else
-      return 403
-      # statement = db.prepare('SELECT id, name, password, salt FROM user WHERE name = ? limit 1')
-      # row = statement.execute(name).first
-      # $redis.set("user_name_#{name}", row.id)
+      statement = db.prepare('SELECT id, name, password, salt FROM user WHERE name = ? limit 1')
+      row = statement.execute(name).first
+      $redis.set("user_name_to_id_#{name}", row['id'])
+      $redis.set("user_#{user_id}", row.to_json)
     end
 
     if row.nil? || row['password'] != Digest::SHA1.hexdigest(row['salt'] + params[:password])
