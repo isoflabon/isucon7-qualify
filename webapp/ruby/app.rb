@@ -28,12 +28,12 @@ class App < Sinatra::Base
       user_id = session[:user_id]
       return nil if user_id.nil?
 
-      user_on_cache = $redis.get("user_id_#{user_id}")
+      user_on_cache = $redis.get("user_#{user_id}")
       if user_on_cache
         @_user = JSON.parse(user_on_cache)
       else
         @_user = db_get_user(user_id)
-        $redis.set("user_id_#{user_id}", @_user.to_json)
+        $redis.set("user_#{user_id}", @_user.to_json)
       end
 
       if @_user.nil?
@@ -76,6 +76,7 @@ class App < Sinatra::Base
   end
 
   post '/register' do
+    # TODO: 新規ユーザはcacheに乗せておく
     name = params[:name]
     pw = params[:password]
     if name.nil? || name.empty? || pw.nil? || pw.empty?
@@ -98,8 +99,15 @@ class App < Sinatra::Base
   post '/login' do
     # name => user_infoを載せておいてsql書かないようにするとよい？
     name = params[:name]
-    statement = db.prepare('SELECT id, name, password, salt FROM user WHERE name = ? limit 1')
-    row = statement.execute(name).first
+    user_on_cache = $redis.get("user_name_#{name}")
+    if user_on_cache
+      row = JSON.parse(user_on_cache)
+    else
+      statement = db.prepare('SELECT id, name, password, salt FROM user WHERE name = ? limit 1')
+      row = statement.execute(name).first
+      $redis.set("user_name_#{name}", row.to_json)
+    end
+
     if row.nil? || row['password'] != Digest::SHA1.hexdigest(row['salt'] + params[:password])
       return 403
     end
