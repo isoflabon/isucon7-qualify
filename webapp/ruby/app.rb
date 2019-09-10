@@ -115,8 +115,10 @@ class App < Sinatra::Base
     else
       statement = db.prepare('SELECT id, name, password, salt FROM user WHERE name = ? limit 1')
       row = statement.execute(name).first
-      $redis.set("user_name_to_id_#{name}", row['id'])
-      $redis.set("user_#{user_id}", row.to_json)
+      unless row.nil?
+        $redis.set("user_name_to_id_#{name}", row['id'])
+        $redis.set("user_#{user_id}", row.to_json)
+      end
     end
 
     if row.nil? || row['password'] != Digest::SHA1.hexdigest(row['salt'] + params[:password])
